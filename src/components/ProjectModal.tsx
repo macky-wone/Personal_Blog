@@ -1,16 +1,19 @@
 import React, { useEffect, useId, useRef } from 'react';
-import { ProjectItem } from '../types';
+import { Language, ProjectItem } from '../types';
+import { getPortfolioContent } from '../data/cvData';
 import { closeTopLayer, handleDialogBackdropClickFallback } from '../utils/modernWeb';
 import { ProjectVisual } from './ProjectVisual';
 
 interface ProjectModalProps {
   project: ProjectItem | null;
+  lang: Language;
   onClose: () => void;
 }
 
-export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) => {
+export const ProjectModal: React.FC<ProjectModalProps> = ({ project, lang, onClose }) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const labels = getPortfolioContent(lang).ui.projectModal;
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -68,7 +71,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) 
               type="button"
               className="dialog-close-btn"
               onClick={() => void closeTopLayer(dialogRef.current)}
-              aria-label="Fermer la fenêtre de détails du projet"
+              aria-label={labels.closeAria}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
@@ -80,7 +83,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) 
             <div className="dialog-visual-col">
               <ProjectVisual visualType={project.visualType} />
               <div className="dialog-tech-box">
-                <h4 className="dialog-subhead">Stack &amp; Outils</h4>
+                <h4 className="dialog-subhead">{labels.stackTitle}</h4>
                 <div className="tech-tags-wrap">
                   {project.technologies.map((tech) => (
                     <span key={tech} className="tech-tag">
@@ -99,7 +102,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) 
               <p className="dialog-description">{project.fullDescription}</p>
 
               <div className="dialog-architecture">
-                <h4 className="dialog-subhead">Points clés &amp; Architecture</h4>
+                <h4 className="dialog-subhead">{labels.architectureTitle}</h4>
                 <ul className="architecture-list">
                   {project.architecturePoints.map((point, idx) => (
                     <li key={idx}>{point}</li>

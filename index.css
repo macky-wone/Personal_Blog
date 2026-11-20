@@ -323,6 +323,41 @@ img {
   color: var(--text-primary);
 }
 
+.lang-toggle {
+  height: 38px;
+  padding: 0 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(var(--accent-cyan-rgb), 0.05);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+}
+
+.lang-toggle span {
+  transition: color 0.2s ease;
+}
+
+.lang-toggle span.is-active {
+  color: var(--accent-cyan);
+}
+
+.lang-toggle .lang-sep {
+  opacity: 0.45;
+}
+
+.lang-toggle:hover {
+  border-color: var(--border-highlight);
+  box-shadow: var(--glow-sm);
+}
+
 .icon-btn {
   width: 38px;
   height: 38px;

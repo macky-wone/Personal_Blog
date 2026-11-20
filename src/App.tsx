@@ -1,42 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import {
-  EDUCATION_DATA,
-  EXPERIENCES_DATA,
-  HOBBIES_DATA,
-  LANGUAGES_DATA,
-  PROFILE_DATA,
-  PROJECTS_DATA,
-  SKILLS_DATA,
-} from './data/cvData';
-import { ProjectCategory, ProjectItem, SectionId } from './types';
+import { getPortfolioContent } from './data/cvData';
+import { Language, ProjectCategory, SectionId } from './types';
 import { runDirectionalViewTransition } from './utils/modernWeb';
 import { ProjectVisual } from './components/ProjectVisual';
 import { ProjectModal } from './components/ProjectModal';
 import { CvModal } from './components/CvModal';
 
-const SECTIONS_ORDER: { id: SectionId; label: string }[] = [
-  { id: 'home', label: 'Accueil' },
-  { id: 'about', label: 'À propos' },
-  { id: 'skills', label: 'Compétences' },
-  { id: 'experience', label: 'Parcours' },
-  { id: 'projects', label: 'Projets' },
-  { id: 'contact', label: 'Contact' },
-];
-
-const CATEGORY_FILTERS: { id: ProjectCategory; label: string }[] = [
-  { id: 'all', label: 'Tous' },
-  { id: 'web', label: 'Full-Stack' },
-  { id: 'ai-rust', label: 'IA & Rust' },
-  { id: 'compilation', label: 'Compilation' },
-  { id: 'network', label: 'Réseaux' },
-];
-
-const HERO_STATS = [
-  { value: '3e', label: 'Année cycle ingénieur', icon: 'cap' },
-  { value: '3', label: 'Stages en entreprise', icon: 'briefcase' },
-  { value: '4+', label: 'Projets techniques', icon: 'layers' },
-  { value: '4', label: 'Langues parlées', icon: 'globe' },
-] as const;
+const SECTIONS_IDS: SectionId[] = ['home', 'about', 'skills', 'experience', 'projects', 'contact'];
+const CATEGORY_IDS: ProjectCategory[] = ['all', 'web', 'ai-rust', 'compilation', 'network'];
 
 /* -------------------------------------------------------------------------- */
 /*  Inline icon set (stroke icons, 24x24)                                     */
@@ -195,7 +166,6 @@ const Icon: React.FC<{ name: IconName; className?: string }> = ({ name, classNam
   </svg>
 );
 
-/* Section title in the style "ABOUT" with a cyan underline */
 const SectionTitle: React.FC<{ eyebrow?: string; title: string; action?: React.ReactNode }> = ({
   eyebrow,
   title,
@@ -215,21 +185,45 @@ const SectionTitle: React.FC<{ eyebrow?: string; title: string; action?: React.R
   </div>
 );
 
+const getInitialLang = (): Language => {
+  try {
+    const saved = window.localStorage.getItem('portfolio-lang');
+    if (saved === 'fr' || saved === 'en') return saved;
+  } catch {
+    // Ignore storage access errors
+  }
+  return 'fr';
+};
+
 export const App: React.FC = () => {
+  const [lang, setLang] = useState<Language>(getInitialLang);
   const [activeSection, setActiveSection] = useState<SectionId>('home');
   const [viewMode, setViewMode] = useState<'scroll' | 'slides'>('scroll');
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [activeCategory, setActiveCategory] = useState<ProjectCategory>('all');
-  const [selectedProject, setSelectedProject] = useState<ProjectItem | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [isCvModalOpen, setIsCvModalOpen] = useState(false);
   const [copiedField, setCopiedField] = useState<'email' | 'phone' | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [hasPhoto, setHasPhoto] = useState(true);
   const [scrolled, setScrolled] = useState(false);
 
+  const content = getPortfolioContent(lang);
+  const { profile, experiences, projects, skills, education, languages, hobbies, ui } = content;
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    document.title = ui.pageTitle;
+    try {
+      window.localStorage.setItem('portfolio-lang', lang);
+    } catch {
+      // Ignore storage access errors
+    }
+  }, [lang, ui.pageTitle]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -255,7 +249,7 @@ export const App: React.FC = () => {
       { threshold: [0.25, 0.55], rootMargin: '-80px 0px -30% 0px' }
     );
 
-    SECTIONS_ORDER.forEach(({ id }) => {
+    SECTIONS_IDS.forEach((id) => {
       const el = document.getElementById(id);
       if (el) observer.observe(el);
     });
@@ -268,8 +262,8 @@ export const App: React.FC = () => {
 
     if (viewMode === 'slides') {
       if (target === activeSection) return;
-      const prevIdx = SECTIONS_ORDER.findIndex((s) => s.id === activeSection);
-      const nextIdx = SECTIONS_ORDER.findIndex((s) => s.id === target);
+      const prevIdx = SECTIONS_IDS.indexOf(activeSection);
+      const nextIdx = SECTIONS_IDS.indexOf(target);
       const direction = nextIdx >= prevIdx ? 'forward' : 'backward';
 
       runDirectionalViewTransition(() => {
@@ -292,6 +286,10 @@ export const App: React.FC = () => {
     runDirectionalViewTransition(() => setViewMode(nextMode), 'forward');
   };
 
+  const toggleLanguage = () => {
+    setLang((prev) => (prev === 'fr' ? 'en' : 'fr'));
+  };
+
   const copyToClipboard = async (value: string, field: 'email' | 'phone') => {
     try {
       await navigator.clipboard.writeText(value);
@@ -304,38 +302,55 @@ export const App: React.FC = () => {
 
   const filteredProjects =
     activeCategory === 'all'
-      ? PROJECTS_DATA
-      : PROJECTS_DATA.filter((project) => project.category === activeCategory);
+      ? projects
+      : projects.filter((project) => project.category === activeCategory);
+
+  const selectedProject = selectedProjectId
+    ? projects.find((project) => project.id === selectedProjectId) ?? null
+    : null;
 
   const isSectionVisible = (id: SectionId) => viewMode === 'scroll' || activeSection === id;
 
   const skillLevelLabel = (level: number) =>
-    level >= 85 ? 'Avancé' : level >= 72 ? 'Confirmé' : 'Intermédiaire';
+    level >= 85
+      ? ui.skills.levels.advanced
+      : level >= 72
+        ? ui.skills.levels.proficient
+        : ui.skills.levels.intermediate;
 
-  /* Social / quick-contact icons (hero + footer) */
   const quickLinks = (
     <div className="social-row">
-      <a href={`mailto:${PROFILE_DATA.email}`} className="social-btn" aria-label="Email" title={PROFILE_DATA.email}>
+      <a
+        href={`mailto:${profile.email}`}
+        className="social-btn"
+        aria-label={ui.hero.quickEmail}
+        title={profile.email}
+      >
         <Icon name="mail" />
       </a>
-      <a href={PROFILE_DATA.phoneHref} className="social-btn" aria-label="Téléphone" title={PROFILE_DATA.phone}>
+      <a
+        href={profile.phoneHref}
+        className="social-btn"
+        aria-label={ui.hero.quickPhone}
+        title={profile.phone}
+      >
         <Icon name="phone" />
       </a>
       <button
         type="button"
         className="social-btn"
-        aria-label="Voir le CV"
-        title="Voir le CV"
+        aria-label={ui.hero.quickViewCv}
+        title={ui.hero.quickViewCv}
         onClick={() => setIsCvModalOpen(true)}
       >
         <Icon name="file" />
       </button>
       <a
-        href={PROFILE_DATA.cvPdfUrl}
+        href={profile.cvPdfUrl}
         download="CV_Macky_Mamadou_Wone.pdf"
         className="social-btn"
-        aria-label="Télécharger le CV"
-        title="Télécharger le CV"
+        aria-label={ui.hero.quickDownloadCv}
+        title={ui.hero.quickDownloadCv}
       >
         <Icon name="download" />
       </a>
@@ -372,9 +387,9 @@ export const App: React.FC = () => {
             </span>
           </a>
 
-          <nav className={`primary-nav ${mobileMenuOpen ? 'is-open' : ''}`} aria-label="Navigation principale">
+          <nav className={`primary-nav ${mobileMenuOpen ? 'is-open' : ''}`} aria-label={ui.navAriaLabel}>
             <ul className="nav-list">
-              {SECTIONS_ORDER.map(({ id, label }) => (
+              {SECTIONS_IDS.map((id) => (
                 <li key={id}>
                   <a
                     href={`#${id}`}
@@ -385,7 +400,7 @@ export const App: React.FC = () => {
                       navigateToSection(id);
                     }}
                   >
-                    {label}
+                    {ui.sections[id]}
                   </a>
                 </li>
               ))}
@@ -393,16 +408,27 @@ export const App: React.FC = () => {
           </nav>
 
           <div className="header-controls">
-            <a href={PROFILE_DATA.phoneHref} className="header-phone">
+            <a href={profile.phoneHref} className="header-phone">
               <Icon name="phone" />
-              <span>{PROFILE_DATA.phone}</span>
+              <span>{profile.phone}</span>
             </a>
+            <button
+              type="button"
+              className="lang-toggle"
+              onClick={toggleLanguage}
+              aria-label={ui.header.langSwitchAria}
+              title={ui.header.langSwitchTitle}
+            >
+              <span className={lang === 'fr' ? 'is-active' : ''}>FR</span>
+              <span className="lang-sep" aria-hidden="true">/</span>
+              <span className={lang === 'en' ? 'is-active' : ''}>EN</span>
+            </button>
             <button
               type="button"
               className="icon-btn"
               onClick={toggleViewMode}
-              aria-label={viewMode === 'scroll' ? 'Passer en mode diapositives' : 'Passer en mode défilement'}
-              title={viewMode === 'scroll' ? 'Mode diapositives' : 'Mode défilement'}
+              aria-label={viewMode === 'scroll' ? ui.header.switchToSlides : ui.header.switchToScroll}
+              title={viewMode === 'scroll' ? ui.header.slidesTitle : ui.header.scrollTitle}
             >
               <Icon name={viewMode === 'scroll' ? 'slides' : 'scroll'} />
             </button>
@@ -410,8 +436,8 @@ export const App: React.FC = () => {
               type="button"
               className="icon-btn"
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              aria-label={theme === 'dark' ? 'Activer le thème clair' : 'Activer le thème sombre'}
-              title={theme === 'dark' ? 'Thème clair' : 'Thème sombre'}
+              aria-label={theme === 'dark' ? ui.header.switchToLight : ui.header.switchToDark}
+              title={theme === 'dark' ? ui.header.lightTitle : ui.header.darkTitle}
             >
               <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
             </button>
@@ -420,14 +446,14 @@ export const App: React.FC = () => {
               className="btn btn-glow btn-sm header-cta"
               onClick={() => navigateToSection('contact')}
             >
-              <span>Me contacter</span>
+              <span>{ui.header.contactCta}</span>
               <Icon name="send" />
             </button>
             <button
               type="button"
               className="icon-btn mobile-toggle"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label="Menu"
+              aria-label={ui.header.menuAriaLabel}
               aria-expanded={mobileMenuOpen}
             >
               <Icon name={mobileMenuOpen ? 'close' : 'menu'} />
@@ -449,30 +475,27 @@ export const App: React.FC = () => {
                 <div className="hero-copy">
                   <span className="eyebrow-chip available">
                     <span className="status-pulse" />
-                    Disponible pour un stage PFE
+                    {ui.hero.availableBadge}
                   </span>
 
-                  <p className="hero-hello">Salut, je suis</p>
+                  <p className="hero-hello">{ui.hero.greeting}</p>
                   <h1 className="hero-title">
-                    <span className="hero-firstname">{PROFILE_DATA.firstName}</span>
+                    <span className="hero-firstname">{profile.firstName}</span>
                     <span className="hero-lastname">
-                      {PROFILE_DATA.lastName}
+                      {profile.lastName}
                       <span className="type-cursor" aria-hidden="true" />
                     </span>
                   </h1>
-                  <p className="hero-role">{PROFILE_DATA.title}</p>
-                  <p className="hero-lead">
-                    IA appliquée (OCR Python/Rust), développement Full-Stack temps réel et réseaux sécurisés —
-                    je conçois des systèmes rapides, robustes et bien pensés.
-                  </p>
+                  <p className="hero-role">{profile.title}</p>
+                  <p className="hero-lead">{ui.hero.lead}</p>
 
                   <div className="hero-cta-row">
                     <button type="button" className="btn btn-glow" onClick={() => navigateToSection('projects')}>
-                      <span>Voir mes projets</span>
+                      <span>{ui.hero.viewProjects}</span>
                       <Icon name="arrow-up-right" />
                     </button>
                     <button type="button" className="btn btn-outline" onClick={() => setIsCvModalOpen(true)}>
-                      <span>Mon CV</span>
+                      <span>{ui.hero.myCv}</span>
                       <Icon name="download" />
                     </button>
                   </div>
@@ -483,13 +506,13 @@ export const App: React.FC = () => {
                     <span className="mouse" aria-hidden="true">
                       <span />
                     </span>
-                    Défiler
+                    {ui.hero.scrollHint}
                   </button>
                 </div>
 
                 <div className="hero-aside">
                   <div className="glass-card stats-card">
-                    {HERO_STATS.map((stat) => (
+                    {ui.hero.stats.map((stat) => (
                       <div key={stat.label} className="stat-row">
                         <span className="stat-icon">
                           <Icon name={stat.icon} />
@@ -511,16 +534,19 @@ export const App: React.FC = () => {
                     </div>
                     <pre className="code-block">
                       <code>
-                        <span className="c-kw">struct</span> <span className="c-type">IngenieurGeIT</span> {'{'}
+                        <span className="c-kw">struct</span> <span className="c-type">{ui.hero.code.structName}</span>{' '}
+                        {'{'}
                         {'\n  '}
-                        <span className="c-prop">ecole</span>: <span className="c-str">"IPSL — UGB"</span>,
+                        <span className="c-prop">{ui.hero.code.schoolKey}</span>:{' '}
+                        <span className="c-str">&quot;{ui.hero.code.schoolVal}&quot;</span>,
                         {'\n  '}
-                        <span className="c-prop">promo</span>: <span className="c-num">2027</span>,
+                        <span className="c-prop">{ui.hero.code.promoKey}</span>: <span className="c-num">2027</span>,
                         {'\n  '}
-                        <span className="c-prop">stack</span>: [<span className="c-str">"Rust"</span>,{' '}
-                        <span className="c-str">"Python"</span>, <span className="c-str">"React"</span>],
+                        <span className="c-prop">{ui.hero.code.stackKey}</span>: [<span className="c-str">&quot;Rust&quot;</span>,{' '}
+                        <span className="c-str">&quot;Python&quot;</span>, <span className="c-str">&quot;React&quot;</span>],
                         {'\n  '}
-                        <span className="c-prop">focus</span>: <span className="c-str">"IA · Web · Réseaux"</span>,
+                        <span className="c-prop">{ui.hero.code.focusKey}</span>:{' '}
+                        <span className="c-str">&quot;{ui.hero.code.focusVal}&quot;</span>,
                         {'\n'}
                         {'}'}
                       </code>
@@ -540,37 +566,31 @@ export const App: React.FC = () => {
             <div className="section-inner">
               <div className="about-panel">
                 <div className="about-copy">
-                  <h2 className="section-title big">À propos</h2>
-                  <a href={`mailto:${PROFILE_DATA.email}`} className="about-email">
-                    {PROFILE_DATA.email}
+                  <h2 className="section-title big">{ui.about.title}</h2>
+                  <a href={`mailto:${profile.email}`} className="about-email">
+                    {profile.email}
                   </a>
 
                   <div className="about-paragraphs">
-                    {PROFILE_DATA.aboutParagraphs.map((paragraph, index) => (
+                    {profile.aboutParagraphs.map((paragraph, index) => (
                       <p key={index}>{paragraph}</p>
                     ))}
                   </div>
 
                   <div className="about-facts">
-                    <div>
-                      <span>Formation</span>
-                      <strong>IPSL — UGB</strong>
-                    </div>
-                    <div>
-                      <span>Diplôme</span>
-                      <strong>Ingénieur 2027</strong>
-                    </div>
-                    <div>
-                      <span>Spécialité</span>
-                      <strong>Génie Info & Télécom</strong>
-                    </div>
+                    {ui.about.facts.map((fact) => (
+                      <div key={fact.label}>
+                        <span>{fact.label}</span>
+                        <strong>{fact.value}</strong>
+                      </div>
+                    ))}
                   </div>
 
                   <p className="about-address">
                     <span className="line" />
                     <span>
                       <Icon name="pin" />
-                      {PROFILE_DATA.location}
+                      {profile.location}
                     </span>
                     <span className="line" />
                   </p>
@@ -581,7 +601,7 @@ export const App: React.FC = () => {
                     {hasPhoto && (
                       <img
                         src="./assets/photo.jpg"
-                        alt={`Portrait de ${PROFILE_DATA.fullName}`}
+                        alt={ui.about.portraitAlt}
                         onError={() => setHasPhoto(false)}
                       />
                     )}
@@ -604,7 +624,7 @@ export const App: React.FC = () => {
               </div>
 
               <div className="pillars-grid">
-                {PROFILE_DATA.pillars.map((pillar) => (
+                {profile.pillars.map((pillar) => (
                   <article key={pillar.title} className="glass-card pillar-card">
                     <span className="pillar-icon">
                       <Icon name={pillar.icon as IconName} />
@@ -632,10 +652,10 @@ export const App: React.FC = () => {
           <section id="skills" className="portfolio-section skills-section">
             <div className="section-inner">
               <div className="glass-panel">
-                <SectionTitle eyebrow="Mon expertise" title="Compétences & Technologies" />
+                <SectionTitle eyebrow={ui.skills.eyebrow} title={ui.skills.title} />
 
                 <div className="skills-grid">
-                  {SKILLS_DATA.map((skill) => (
+                  {skills.map((skill) => (
                     <article key={skill.id} className="skill-card">
                       <span className="skill-logo">{skill.badge}</span>
                       <h3>{skill.name}</h3>
@@ -673,9 +693,9 @@ export const App: React.FC = () => {
 
                 {/* Column 1 — Experience timeline */}
                 <div className="resume-col">
-                  <h2 className="col-title">Expérience</h2>
+                  <h2 className="col-title">{ui.resume.experienceTitle}</h2>
                   <ol className="timeline">
-                    {EXPERIENCES_DATA.map((exp) => (
+                    {experiences.map((exp) => (
                       <li key={exp.id} className={`timeline-item ${exp.isLatest ? 'is-latest' : ''}`}>
                         <span className="timeline-badge">
                           <small>{exp.period.match(/\d{4}/)?.[0]}</small>
@@ -707,9 +727,9 @@ export const App: React.FC = () => {
 
                 {/* Column 2 — Education + Languages */}
                 <div className="resume-col">
-                  <h2 className="col-title">Formation</h2>
+                  <h2 className="col-title">{ui.resume.educationTitle}</h2>
                   <ul className="edu-list">
-                    {EDUCATION_DATA.map((edu) => (
+                    {education.map((edu) => (
                       <li key={edu.id} className={edu.current ? 'is-current' : ''}>
                         <span className="edu-period">{edu.period}</span>
                         <strong>{edu.degree}</strong>
@@ -719,23 +739,23 @@ export const App: React.FC = () => {
                     ))}
                   </ul>
 
-                  <h2 className="col-title">Langues</h2>
+                  <h2 className="col-title">{ui.resume.languagesTitle}</h2>
                   <ul className="slider-list">
-                    {LANGUAGES_DATA.map((lang) => (
-                      <li key={lang.name}>
+                    {languages.map((item) => (
+                      <li key={item.name}>
                         <div className="slider-label">
-                          <span>{lang.name}</span>
-                          <small>{lang.levelLabel}</small>
+                          <span>{item.name}</span>
+                          <small>{item.levelLabel}</small>
                         </div>
                         <div
                           className="slider-track"
                           role="meter"
                           aria-valuemin={0}
                           aria-valuemax={4}
-                          aria-valuenow={lang.dots}
-                          aria-label={`${lang.name} : ${lang.levelLabel}`}
+                          aria-valuenow={item.dots}
+                          aria-label={ui.resume.languageMeterAria(item.name, item.levelLabel)}
                         >
-                          <span style={{ width: `${(lang.dots / 4) * 100}%` }} />
+                          <span style={{ width: `${(item.dots / 4) * 100}%` }} />
                         </div>
                       </li>
                     ))}
@@ -744,9 +764,9 @@ export const App: React.FC = () => {
 
                 {/* Column 3 — What I do + hobbies */}
                 <div className="resume-col">
-                  <h2 className="col-title">Ce que je fais</h2>
+                  <h2 className="col-title">{ui.resume.whatIDoTitle}</h2>
                   <ul className="do-list">
-                    {PROFILE_DATA.pillars.map((p) => (
+                    {profile.pillars.map((p) => (
                       <li key={p.title}>
                         <strong>{p.title}</strong>
                         <span>{p.tags.slice(0, 4).join(' · ')}</span>
@@ -754,9 +774,9 @@ export const App: React.FC = () => {
                     ))}
                   </ul>
 
-                  <h2 className="col-title">Centres d’intérêt</h2>
+                  <h2 className="col-title">{ui.resume.hobbiesTitle}</h2>
                   <ul className="hobby-grid">
-                    {HOBBIES_DATA.map((hobby) => (
+                    {hobbies.map((hobby) => (
                       <li key={hobby.name} title={hobby.description}>
                         <span className="hobby-icon">
                           <Icon name={hobby.icon} />
@@ -768,7 +788,7 @@ export const App: React.FC = () => {
 
                   <button type="button" className="btn btn-outline btn-sm" onClick={() => setIsCvModalOpen(true)}>
                     <Icon name="eye" />
-                    <span>CV complet</span>
+                    <span>{ui.resume.fullCvBtn}</span>
                   </button>
                 </div>
 
@@ -788,20 +808,20 @@ export const App: React.FC = () => {
             <div className="section-inner">
               <div className="glass-panel">
                 <SectionTitle
-                  eyebrow="Travaux sélectionnés"
-                  title="Projets & Architectures"
+                  eyebrow={ui.projects.eyebrow}
+                  title={ui.projects.title}
                   action={
-                    <div className="filter-bar" role="tablist" aria-label="Filtrer les projets">
-                      {CATEGORY_FILTERS.map((filter) => (
+                    <div className="filter-bar" role="tablist" aria-label={ui.projects.filterAriaLabel}>
+                      {CATEGORY_IDS.map((categoryId) => (
                         <button
-                          key={filter.id}
+                          key={categoryId}
                           type="button"
                           role="tab"
-                          aria-selected={activeCategory === filter.id}
-                          className={`filter-chip ${activeCategory === filter.id ? 'active' : ''}`}
-                          onClick={() => handleCategoryChange(filter.id)}
+                          aria-selected={activeCategory === categoryId}
+                          className={`filter-chip ${activeCategory === categoryId ? 'active' : ''}`}
+                          onClick={() => handleCategoryChange(categoryId)}
                         >
-                          {filter.label}
+                          {ui.categories[categoryId]}
                         </button>
                       ))}
                     </div>
@@ -813,14 +833,14 @@ export const App: React.FC = () => {
                     <article
                       key={project.id}
                       className={`project-card accent-${project.accentColor}`}
-                      onClick={() => setSelectedProject(project)}
+                      onClick={() => setSelectedProjectId(project.id)}
                       tabIndex={0}
                       role="button"
-                      aria-label={`Voir les détails du projet ${project.title}`}
+                      aria-label={ui.projects.cardAriaLabel(project.title)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
-                          setSelectedProject(project);
+                          setSelectedProjectId(project.id);
                         }
                       }}
                     >
@@ -862,18 +882,19 @@ export const App: React.FC = () => {
             <div className="section-inner">
               <div className="cta-banner">
                 <div className="cta-title">
-                  <p>Construisons quelque chose</p>
-                  <h2>d’exceptionnel ensemble 👋</h2>
+                  <p>{ui.contact.ctaLine1}</p>
+                  <h2>{ui.contact.ctaLine2}</h2>
                 </div>
                 <p className="cta-text">
-                  À la recherche d’un <strong>stage de fin d’études (PFE)</strong> en Data Science / IA, ingénierie
-                  logicielle ou réseaux & sécurité. Discutons de votre projet !
+                  {ui.contact.ctaTextPrefix}
+                  <strong>{ui.contact.ctaTextStrong}</strong>
+                  {ui.contact.ctaTextSuffix}
                 </p>
                 <a
-                  href={`mailto:${PROFILE_DATA.email}?subject=Contact%20depuis%20votre%20portfolio`}
+                  href={`mailto:${profile.email}?subject=${encodeURIComponent(ui.contact.emailSubject)}`}
                   className="btn btn-glow"
                 >
-                  <span>Me contacter</span>
+                  <span>{ui.contact.ctaButton}</span>
                   <Icon name="send" />
                 </a>
               </div>
@@ -884,15 +905,15 @@ export const App: React.FC = () => {
                     <Icon name="mail" />
                   </span>
                   <div className="contact-info">
-                    <span>Email</span>
-                    <a href={`mailto:${PROFILE_DATA.email}`}>{PROFILE_DATA.email}</a>
+                    <span>{ui.contact.emailLabel}</span>
+                    <a href={`mailto:${profile.email}`}>{profile.email}</a>
                   </div>
                   <button
                     type="button"
                     className="copy-chip"
-                    onClick={() => void copyToClipboard(PROFILE_DATA.email, 'email')}
+                    onClick={() => void copyToClipboard(profile.email, 'email')}
                   >
-                    {copiedField === 'email' ? 'Copié ✓' : 'Copier'}
+                    {copiedField === 'email' ? ui.contact.copied : ui.contact.copy}
                   </button>
                 </div>
                 <div className="glass-card contact-card">
@@ -900,15 +921,15 @@ export const App: React.FC = () => {
                     <Icon name="phone" />
                   </span>
                   <div className="contact-info">
-                    <span>Téléphone</span>
-                    <a href={PROFILE_DATA.phoneHref}>{PROFILE_DATA.phone}</a>
+                    <span>{ui.contact.phoneLabel}</span>
+                    <a href={profile.phoneHref}>{profile.phone}</a>
                   </div>
                   <button
                     type="button"
                     className="copy-chip"
-                    onClick={() => void copyToClipboard(PROFILE_DATA.phone, 'phone')}
+                    onClick={() => void copyToClipboard(profile.phone, 'phone')}
                   >
-                    {copiedField === 'phone' ? 'Copié ✓' : 'Copier'}
+                    {copiedField === 'phone' ? ui.contact.copied : ui.contact.copy}
                   </button>
                 </div>
                 <div className="glass-card contact-card">
@@ -916,8 +937,8 @@ export const App: React.FC = () => {
                     <Icon name="pin" />
                   </span>
                   <div className="contact-info">
-                    <span>Localisation</span>
-                    <strong>{PROFILE_DATA.location}</strong>
+                    <span>{ui.contact.locationLabel}</span>
+                    <strong>{profile.location}</strong>
                   </div>
                 </div>
               </div>
@@ -932,10 +953,10 @@ export const App: React.FC = () => {
       <footer className="site-footer">
         <div className="footer-inner">
           <span className="footer-copy">
-            © {new Date().getFullYear()} {PROFILE_DATA.fullName}. Tous droits réservés.
+            © {new Date().getFullYear()} {profile.fullName}. {ui.footer.rights}
           </span>
-          <nav className="footer-nav" aria-label="Navigation secondaire">
-            {SECTIONS_ORDER.map(({ id, label }) => (
+          <nav className="footer-nav" aria-label={ui.footerNavAriaLabel}>
+            {SECTIONS_IDS.map((id) => (
               <a
                 key={id}
                 href={`#${id}`}
@@ -944,7 +965,7 @@ export const App: React.FC = () => {
                   navigateToSection(id);
                 }}
               >
-                {label}
+                {ui.sections[id]}
               </a>
             ))}
           </nav>
@@ -952,13 +973,13 @@ export const App: React.FC = () => {
             <span className="back-top-icon">
               <Icon name="arrow-up" />
             </span>
-            Haut de page
+            {ui.footer.backToTop}
           </button>
         </div>
       </footer>
 
-      <ProjectModal project={selectedProject} onClose={() => setSelectedProject(null)} />
-      <CvModal isOpen={isCvModalOpen} onClose={() => setIsCvModalOpen(false)} />
+      <ProjectModal project={selectedProject} lang={lang} onClose={() => setSelectedProjectId(null)} />
+      <CvModal isOpen={isCvModalOpen} lang={lang} onClose={() => setIsCvModalOpen(false)} />
     </div>
   );
 };

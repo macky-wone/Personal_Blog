@@ -1,3 +1,5 @@
+export type Language = 'fr' | 'en';
+
 export type SectionId = 'home' | 'about' | 'experience' | 'projects' | 'skills' | 'contact';
 
 export type ProjectCategory = 'all' | 'web' | 'ai-rust' | 'compilation' | 'network';

@@ -1,15 +1,19 @@
 import React, { useEffect, useId, useRef } from 'react';
 import { closeTopLayer, handleDialogBackdropClickFallback } from '../utils/modernWeb';
-import { PROFILE_DATA } from '../data/cvData';
+import { getPortfolioContent } from '../data/cvData';
+import { Language } from '../types';
 
 interface CvModalProps {
   isOpen: boolean;
+  lang: Language;
   onClose: () => void;
 }
 
-export const CvModal: React.FC<CvModalProps> = ({ isOpen, onClose }) => {
+export const CvModal: React.FC<CvModalProps> = ({ isOpen, lang, onClose }) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const { profile, ui } = getPortfolioContent(lang);
+  const labels = ui.cvModal;
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -57,28 +61,28 @@ export const CvModal: React.FC<CvModalProps> = ({ isOpen, onClose }) => {
         <div className="dialog-header cv-dialog-header">
           <div>
             <h2 id={titleId} className="dialog-title cv-modal-title">
-              Curriculum Vitae — {PROFILE_DATA.fullName}
+              {labels.titlePrefix} — {profile.fullName}
             </h2>
             <p className="cv-modal-sub">
-              {PROFILE_DATA.subtitle}
+              {profile.subtitle}
             </p>
           </div>
           <div className="cv-header-actions">
             <a
-              href={PROFILE_DATA.cvPdfUrl}
+              href={profile.cvPdfUrl}
               download="CV_Macky_Mamadou_Wone.pdf"
               className="btn btn-primary btn-sm"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <span>Télécharger le PDF</span>
+              <span>{labels.downloadPdf}</span>
             </a>
             <button
               type="button"
               className="dialog-close-btn"
               onClick={() => void closeTopLayer(dialogRef.current)}
-              aria-label="Fermer l'aperçu du CV"
+              aria-label={labels.closeAria}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
@@ -89,8 +93,8 @@ export const CvModal: React.FC<CvModalProps> = ({ isOpen, onClose }) => {
         <div className="cv-iframe-container">
           {isOpen && (
             <iframe
-              src={PROFILE_DATA.cvPdfUrl}
-              title={`CV de ${PROFILE_DATA.fullName}`}
+              src={profile.cvPdfUrl}
+              title={labels.iframeTitle(profile.fullName)}
               className="cv-iframe"
             />
           )}
